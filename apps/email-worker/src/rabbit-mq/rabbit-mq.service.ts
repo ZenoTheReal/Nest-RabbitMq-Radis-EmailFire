@@ -14,8 +14,6 @@ export class RabbitMqService implements OnModuleInit {
 
         this.connection = await amqp.connect(url);
         this.channel = await this.connection.createChannel();
-
-        await this.channel.assertQueue('email.send', { durable: true });
         await this.channel.assertQueue('email.retry', { durable: true });
         await this.channel.assertQueue('email.dlq', { durable: true });
 

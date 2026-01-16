@@ -42,7 +42,7 @@ export class AppController {
 
     const emails = Array.from({ length: 500 }, (_, i) => ({
       email_id: `email_${String(i + 1).padStart(4, '0')}`,
-      to: `user_${Math.floor(Math.random() * 10)}@yopmail.com`,
+      to: `zeno_${Math.floor(Math.random() * 10)}@yopmail.com`,
       subject: 'Welcome',
       body: 'Hello from our service!',
     }));

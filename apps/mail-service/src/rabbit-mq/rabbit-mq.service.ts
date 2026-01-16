@@ -16,8 +16,6 @@ export class RabbitMqService implements OnModuleInit {
         this.channel = await this.connection.createChannel();
 
         await this.channel.assertQueue('email.send', { durable: true });
-        await this.channel.assertQueue('email.retry', { durable: true });
-        await this.channel.assertQueue('email.dlq', { durable: true });
 
         console.log('Connected to Cloud RabbitMQ');
     }
