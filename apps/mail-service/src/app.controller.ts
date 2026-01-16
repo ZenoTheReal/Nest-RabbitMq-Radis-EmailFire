@@ -1,8 +1,6 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
-import { ConfigService } from '@nestjs/config';
-import { RadisService } from './radis/radis.service';
 import { RabbitMqService } from './rabbit-mq/rabbit-mq.service';
 
 import * as fs from 'fs';
@@ -12,9 +10,7 @@ import * as path from 'path';
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly configService: ConfigService,
-    private readonly rabbitMqService: RabbitMqService,
-    private readonly radisService: RadisService
+    private readonly rabbitMqService: RabbitMqService
   ) {
     this.generateEmailsFileIfNotExists();
   }
@@ -22,11 +18,6 @@ export class AppController {
   @Get()
   getHello(): string {
     return this.appService.getHello();
-  }
-
-  @Get('test-redis')
-  async testRedis(): Promise<string | null> {
-    return this.radisService.testConnection();
   }
 
   @Post('publish-emails')

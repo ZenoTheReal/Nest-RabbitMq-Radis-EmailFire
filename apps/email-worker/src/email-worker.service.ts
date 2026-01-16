@@ -19,42 +19,71 @@ export class EmailWorkerService implements OnModuleInit {
     await channel.prefetch(1);
 
     await channel.consume('email.send', async (msg) => {
-      if (!msg) return;
+      try {
 
-      const email = JSON.parse(msg.content.toString());
-      console.log('RECEIVED EMAIL:', email.to);
+        if (!msg) return;
 
-      const redis = this.redisService.client;
-      const dedupeKey = `dedupe:email:${email.to}`;
+        const email = JSON.parse(msg.content.toString());
+        console.log('RECEIVED EMAIL:', email.to);
 
-      const isNew = await redis.setnx(dedupeKey, 'processing');
+        const redis = this.redisService.client;
+        const dedupeKey = `dedupe:email:${email.to}`;
 
-      if (!isNew) {
-        console.log('DUPLICATE DROPPED:', email.to);
+        const isNew = await redis.setnx(dedupeKey, 'processing');
+
+        if (!isNew) {
+          console.log('DUPLICATE DROPPED:', email.to);
+          channel.ack(msg);
+          return;
+        }
+
+        await redis.expire(dedupeKey, 86400); // 24 hours
+
+        await this.sendEmail(email);
+
+        await redis.set(dedupeKey, 'sent');
+
         channel.ack(msg);
-        return;
       }
+      catch (error) {
 
-      await redis.expire(dedupeKey, 86400); // 24 hours
+        await channel.sendToQueue('email.retry', msg.content, { persistent: true, });
+        channel.ack(msg);
+      }
+    });
 
-      await this.sendEmail(email);
+    await channel.consume('email.retry', async (msg) => {
+      try {
+        if (!msg) return;
 
-      await redis.set(dedupeKey, 'sent');
+        const email = JSON.parse(msg.content.toString());
 
-      channel.ack(msg);
+        const retries = email.retries || 0;
+        if (retries >= 3) {
+          console.log('Moving email to DLQ:', email.to);
+          await channel.sendToQueue('email.dlq', msg.content, { persistent: true });
+          channel.ack(msg);
+          return;
+        }
+
+        email.retries = retries + 1; // increment retry counter
+        console.log(`Retrying email #${email.retries}:`, email.to);
+
+        await this.sendEmail(email);
+
+        channel.ack(msg); // success
+      } catch (error) {
+        const email = JSON.parse(msg.content.toString());
+        email.retries = (email.retries || 0) + 1;
+        await channel.sendToQueue('email.retry', Buffer.from(JSON.stringify(email)), { persistent: true });
+        channel.ack(msg);
+      }
     });
   }
 
 
   private async sendEmail(email: { to: string; subject: string; body: string }) {
     try {
-      // Replace this with your real email sending logic
-      // e.g., nodemailer, SendGrid, or any SMTP library
-      console.log(`SENDING EMAIL TO: ${email.to}`);
-      console.log(`SUBJECT: ${email.subject}`);
-      console.log(`BODY: ${email.body}`);
-
-      // Example with nodemailer (uncomment if using):
       const transporter = nodemailer.createTransport({
         service: 'gmail', // use built-in Gmail service
         auth: {
