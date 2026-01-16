@@ -29,6 +29,8 @@ export class EmailWorkerService implements OnModuleInit {
         const redis = this.redisService.client;
         const dedupeKey = `dedupe:email:${email.to}`;
 
+        // const dedupeKey = `dedupe:email:${email.to}:${email.type}`; //for email with type welcome or order etc..
+
         const isNew = await redis.setnx(dedupeKey, 'processing');
 
         if (!isNew) {
