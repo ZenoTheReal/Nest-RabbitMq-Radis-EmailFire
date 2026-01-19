@@ -6,6 +6,15 @@ import { RabbitMqService } from './rabbit-mq/rabbit-mq.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+
+interface Email {
+  email_id: string,
+  to: string,
+  subject: string,
+  type: 'welcome' | 'order' | 'otp',
+  body: string
+}
+
 @Controller()
 export class AppController {
   constructor(
@@ -26,6 +35,7 @@ export class AppController {
     return 'Emails published to RabbitMQ';
   }
 
+  //To generate sample emails to rest out queue
   private generateEmailsFileIfNotExists(): void {
     const dataStorePath = path.join(process.cwd(), 'datastore');
     const filePath = path.join(dataStorePath, 'emails_batch_500.json');
@@ -40,24 +50,41 @@ export class AppController {
       return;
     }
 
-    const emails = Array.from({ length: 500 }, (_, i) => ({
+    const welcome_email: Array<Email> = Array.from({ length: 500 }, (_, i) => ({
       email_id: `email_${String(i + 1).padStart(4, '0')}`,
       to: `zeno_${Math.floor(Math.random() * 10)}@yopmail.com`,
       subject: 'Welcome',
-      body: 'Hello from our service!',
+      type: 'welcome',
+      body: 'Hello welcome to our micro-service!',
     }));
+
+    const order_email: Array<Email> = Array.from({ length: 500 }, (_, i) => ({
+      email_id: `email_${String(i + 1).padStart(4, '0')}`,
+      to: `zeno_${Math.floor(Math.random() * 10)}@yopmail.com`,
+      subject: 'Order',
+      type: 'order',
+      body: `Hello thanks for ordering nothing! OrderId-${i}`,
+    }));
+
+    const otp_email: Array<Email> = Array.from({ length: 500 }, (_, i) => ({
+      email_id: `email_${String(i + 1).padStart(4, '0')}`,
+      to: `zeno_${Math.floor(Math.random() * 10)}@yopmail.com`,
+      subject: 'Otp',
+      type: 'otp',
+      body: `Hello heres your otp for something.`,
+    }));
+
+    const emails = [...welcome_email, ...order_email, ...otp_email]
 
     fs.writeFileSync(filePath, JSON.stringify(emails, null, 2));
     console.log('Email batch file created:', filePath);
   }
 
-  private publishEmails(): void {
+  private async publishEmails(): Promise<void> {
     const filePath = path.join(process.cwd(), 'datastore', 'emails_batch_500.json');
     const emails = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-    emails.forEach(email => {
-      this.rabbitMqService.sendToQueue('email.send', email);
-    });
+    await Promise.all(emails.map(email => this.rabbitMqService.sendToExchange('email.send', email)));
 
     console.log(`Published ${emails.length} emails to RabbitMQ`);
   }

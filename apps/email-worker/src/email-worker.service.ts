@@ -28,9 +28,8 @@ export class EmailWorkerService implements OnModuleInit {
         console.log('RECEIVED EMAIL:', email.to);
 
         const redis = this.redisService.client;
-        const dedupeKey = `dedupe:email:${email.to}`;
 
-        // const dedupeKey = `dedupe:email:${email.to}:${email.type}`; //for email with type welcome or order etc..
+        const dedupeKey = `dedupe:email:${email.to}:${email.type}`
 
         const isNew = await redis.setnx(dedupeKey, 'processing');
 
@@ -40,7 +39,7 @@ export class EmailWorkerService implements OnModuleInit {
           return;
         }
 
-        await redis.expire(dedupeKey, 86400); // 24 hours
+        await redis.expire(dedupeKey, 120); // 2 mins
 
         await this.sendEmail(email);
 
@@ -50,14 +49,13 @@ export class EmailWorkerService implements OnModuleInit {
       }
       catch (error) {
         if (msg) {
-
           await channel.sendToQueue('email.retry', msg.content, { persistent: true, });
           channel.ack(msg);
         }
       }
     });
 
-    await channel.consume('email.retry', async (msg:ConsumeMessage) => {
+    await channel.consume('email.retry', async (msg: ConsumeMessage) => {
       try {
         if (!msg) return;
 
@@ -86,6 +84,21 @@ export class EmailWorkerService implements OnModuleInit {
         }
       }
     });
+
+    await channel.consume('email.notification', async (msg: ConsumeMessage) => {
+      if (!msg) return;
+
+      const email = JSON.parse(msg.content.toString());
+
+      if (email.type == 'order') {
+        //Only send notification on order 
+        console.log('[NOTIFICATION QUEUE] RECEIVED EMAIL:', email.to, '| Type:', email.type);
+      }
+
+      // Just log, no sending or deduplication
+      channel.ack(msg);
+    });
+
   }
 
 
