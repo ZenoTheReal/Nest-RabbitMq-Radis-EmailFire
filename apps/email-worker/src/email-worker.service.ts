@@ -3,6 +3,7 @@ import { RabbitMqService } from './rabbit-mq/rabbit-mq.service';
 import { RadisService } from './radis/radis.service';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
+import { ConsumeMessage } from 'amqplib';
 
 @Injectable()
 export class EmailWorkerService implements OnModuleInit {
@@ -18,7 +19,7 @@ export class EmailWorkerService implements OnModuleInit {
     const channel = this.rabbitMqService.getChannel();
     await channel.prefetch(1);
 
-    await channel.consume('email.send', async (msg) => {
+    await channel.consume('email.send', async (msg: ConsumeMessage) => {
       try {
 
         if (!msg) return;
@@ -48,13 +49,15 @@ export class EmailWorkerService implements OnModuleInit {
         channel.ack(msg);
       }
       catch (error) {
+        if (msg) {
 
-        await channel.sendToQueue('email.retry', msg.content, { persistent: true, });
-        channel.ack(msg);
+          await channel.sendToQueue('email.retry', msg.content, { persistent: true, });
+          channel.ack(msg);
+        }
       }
     });
 
-    await channel.consume('email.retry', async (msg) => {
+    await channel.consume('email.retry', async (msg:ConsumeMessage) => {
       try {
         if (!msg) return;
 
@@ -75,10 +78,12 @@ export class EmailWorkerService implements OnModuleInit {
 
         channel.ack(msg); // success
       } catch (error) {
-        const email = JSON.parse(msg.content.toString());
-        email.retries = (email.retries || 0) + 1;
-        await channel.sendToQueue('email.retry', Buffer.from(JSON.stringify(email)), { persistent: true });
-        channel.ack(msg);
+        if (msg) {
+          const email = JSON.parse(msg.content.toString());
+          email.retries = (email.retries || 0) + 1;
+          await channel.sendToQueue('email.retry', Buffer.from(JSON.stringify(email)), { persistent: true });
+          channel.ack(msg);
+        }
       }
     });
   }

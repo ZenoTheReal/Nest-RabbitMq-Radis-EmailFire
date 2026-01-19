@@ -4,8 +4,8 @@ import * as amqp from 'amqplib';
 
 @Injectable()
 export class RabbitMqService implements OnModuleInit {
-    private connection;
-    private channel;
+    private connection:amqp.ChannelModel;
+    private channel:amqp.Channel;
 
     constructor(private readonly configService: ConfigService) {}
 

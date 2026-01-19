@@ -4,8 +4,8 @@ import * as amqp from 'amqplib';
 
 @Injectable()
 export class RabbitMqService implements OnModuleInit {
-    private connection;
-    private channel;
+    private connection:amqp.ChannelModel;
+    private channel:amqp.Channel;
 
     constructor(private readonly configService: ConfigService) {}
 
@@ -14,6 +14,7 @@ export class RabbitMqService implements OnModuleInit {
 
         this.connection = await amqp.connect(url);
         this.channel = await this.connection.createChannel();
+
         await this.channel.assertQueue('email.retry', { durable: true });
         await this.channel.assertQueue('email.dlq', { durable: true });
 
