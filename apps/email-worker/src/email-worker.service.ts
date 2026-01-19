@@ -43,7 +43,7 @@ export class EmailWorkerService implements OnModuleInit {
 
         await this.sendEmail(email);
 
-        await redis.set(dedupeKey, 'sent');
+        await redis.set(dedupeKey, 'sent', 'KEEPTTL');
 
         channel.ack(msg);
       }
